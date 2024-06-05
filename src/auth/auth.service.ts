@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthDto } from './dto';
@@ -70,9 +71,44 @@ export class AuthService {
     });
   }
 
-  signInLocal() {}
+  async signInLocal(payload: AuthDto): Promise<Tokens> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email: payload.email,
+      },
+    });
 
-  logout() {}
+    if (!user) {
+      throw new ForbiddenException('User not found');
+    }
+
+    const passwordMatches = await bcrypt.compare(
+      payload.password,
+      user.password,
+    );
+
+    if (!passwordMatches) {
+      throw new ForbiddenException('Username or password incorrect');
+    }
+
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.updateRefreshTokenToDb(user.id, tokens.refresh_token);
+    return tokens;
+  }
+
+  logout(userId: number) {
+    return this.prisma.user.update({
+      data: {
+        refreshToken: null,
+      },
+      where: {
+        id: userId,
+        refreshToken: {
+          not: null,
+        },
+      },
+    });
+  }
 
   refreshToken() {}
 }
