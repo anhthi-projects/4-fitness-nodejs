@@ -4,43 +4,43 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthDto } from './dto';
 import { Tokens } from './types';
-import { AuthGuard } from '@nestjs/passport';
-import { Request } from 'express';
+import { RtGuard } from 'src/common/guards';
+import { GetCurrentUser, Public } from 'src/common/decorators';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public() // prevent from using AtGuard
   @Post('local/signup')
   @HttpCode(HttpStatus.CREATED)
   signUpLocal(@Body() payload: AuthDto): Promise<Tokens> {
     return this.authService.signUpLocal(payload);
   }
 
+  @Public() // prevent from using AtGuard
   @Post('local/signin')
   @HttpCode(HttpStatus.OK)
   signInLocal(@Body() payload: AuthDto): Promise<Tokens> {
     return this.authService.signInLocal(payload);
   }
 
-  @UseGuards(AuthGuard('jwt')) // same name in access-token.strategy.ts
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout(@Req() req: Request) {
-    const user = req.user;
-    return this.authService.logout(user['sub']);
+  logout(@GetCurrentUser('sub') userId: number) {
+    return this.authService.logout(userId);
   }
 
-  @UseGuards(AuthGuard('jwt-refresh')) // same name in refresh-token.strategy.ts
+  @Public() // by pass AtGuard
+  @UseGuards(RtGuard)
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  refreshToken() {
-    return this.authService.refreshToken();
+  refreshToken(@GetCurrentUser() user: { sub: number; refreshToken: string }) {
+    return this.authService.refreshToken(user.sub, user.refreshToken);
   }
 }

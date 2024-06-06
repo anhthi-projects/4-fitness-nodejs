@@ -110,5 +110,25 @@ export class AuthService {
     });
   }
 
-  refreshToken() {}
+  async refreshToken(userId: number, refreshToken: string) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+
+    if (!user || !user.refreshToken) {
+      throw new ForbiddenException('User not found');
+    }
+
+    const rtMatches = await bcrypt.compare(refreshToken, user.refreshToken);
+
+    if (!rtMatches) {
+      throw new ForbiddenException('Refresh token not matched');
+    }
+
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.updateRefreshTokenToDb(user.id, tokens.refresh_token);
+    return tokens;
+  }
 }
